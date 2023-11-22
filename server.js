@@ -43,7 +43,9 @@ io.on('connection', (socket) => {
     })
 
     socket.on(ACTIONS.CODE_CHANGE, ({ roomId, code }) => {
-        socket.in(roomId).emit(ACTIONS.CODE_CHANGE, { code });
+        socket.to(roomId).emit(ACTIONS.CODE_CHANGE, {
+            code
+        });
     })
 
     socket.on(ACTIONS.SYNC_CODE, ({ code, socketId }) => {
@@ -53,7 +55,7 @@ io.on('connection', (socket) => {
     socket.on('disconnecting', () => {
         const rooms = [...socket.rooms];
         rooms.forEach((roomId) => {
-            socket.in(roomId).emit(ACTIONS.DISCONNECTED, {
+            socket.to(roomId).emit(ACTIONS.DISCONNECTED, {
                 socketId: socket.id,
                 username: userSocketMap[socket.id],
             });

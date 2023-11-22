@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 const Editor = () => {
     const socketRef = useRef(null);
     const codeRef = useRef(null);
+    const [code, setCode] = useState("");
     const location = useLocation();
     const reactNavigator = useNavigate();
     const { roomId } = useParams();
@@ -65,8 +66,30 @@ const Editor = () => {
         }
     }, [])
 
+    useEffect(() => {
+        if (socketRef.current) {
+            socketRef.current.on(ACTIONS.CODE_CHANGE, ({ code }) => {
+                if (code !== null) {
+                    setCode(code);
+                    codeRef.current = code;
+                }
+            })
+        }
+
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.off(ACTIONS.CODE_CHANGE);
+            }
+        }
+    }, [socketRef.current])
+
     const onCodeChange = (code) => {
+        setCode(code);
         codeRef.current = code;
+        socketRef.current.emit(ACTIONS.CODE_CHANGE, {
+            roomId,
+            code,
+        });
     }
 
     const copyRoomId = async () => {
@@ -113,7 +136,12 @@ const Editor = () => {
                 <button className='btn leaveBtn' onClick={leaveRoom}>Leave</button>
             </div>
             <div className='editorWrap'>
-                <CodeEditor socketRef={socketRef} roomId={roomId} onCodeChange={onCodeChange} />
+                <CodeEditor
+                    socketRef={socketRef}
+                    roomId={roomId}
+                    code={code}
+                    onCodeChange={onCodeChange}
+                />
             </div>
         </div>
     )
