@@ -21,7 +21,7 @@ const Editor = () => {
             socketRef.current = await initSocket();
 
             socketRef.current.on('connect', () => {
-                toast.success('Connected to the server');
+                toast.success('Welcome');
             });
 
             socketRef.current.on('connect_error', (err) => handleErrors(err));
