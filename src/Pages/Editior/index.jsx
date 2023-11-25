@@ -1,13 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Client from './Components/Client'
 import CodeEditor from './Components/CodeEditor'
-import { initSocket } from '../../config/socket'
+import { socket, initSocket } from '../../config/socket'
 import ACTIONS from '../../Constants/Actions';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 const Editor = () => {
-    const socketRef = useRef(null);
     const codeRef = useRef(null);
     const [code, setCode] = useState("");
     const location = useLocation();
@@ -18,75 +17,67 @@ const Editor = () => {
 
     useEffect(() => {
         const init = async () => {
-            socketRef.current = await initSocket();
-
-            socketRef.current.on('connect', () => {
-                toast.success('Welcome');
-            });
-
-            socketRef.current.on('connect_error', (err) => handleErrors(err));
-            socketRef.current.on('connect_failed', (err) => handleErrors(err));
-
-            function handleErrors(e) {
-                console.log('socket error', e);
-                toast.error('Socket connection failed, try again later.');
-                reactNavigator('/');
-            }
-
-            socketRef.current.emit(ACTIONS.JOIN, {
-                roomId,
-                username: location.state?.username
-            })
-
-            socketRef.current.on(ACTIONS.JOINED, ({ clients, username, socketId }) => {
-                if (username !== location.state?.username) {
-                    toast.success(`${username} joined the room.`);
-                }
-                setClients(clients);
-                socketRef.current.emit(ACTIONS.SYNC_CODE, {
-                    code: codeRef.current,
-                    socketId
-                })
-            })
-
-            socketRef.current.on(ACTIONS.DISCONNECTED, ({ socketId, username }) => {
-                toast.success(`${username} left the room`);
-                setClients((currentClients) => {
-                    const updatedClients = currentClients.filter((client) => client.socketId !== socketId);
-                    return updatedClients;
-                })
-            })
+            await initSocket();
         }
         init();
 
+        socket.on('connect', () => {
+            toast.success('Welcome');
+        });
+
+        socket.on('connect_error', (err) => handleErrors(err));
+        socket.on('connect_failed', (err) => handleErrors(err));
+
+        function handleErrors(e) {
+            console.log('socket error', e);
+            toast.error('Socket connection failed, try again later.');
+            reactNavigator('/');
+        }
+
+        socket.emit(ACTIONS.JOIN, {
+            roomId,
+            username: location.state?.username
+        })
+
+        socket.on(ACTIONS.JOINED, ({ clients, username, socketId }) => {
+            if (username !== location.state?.username) {
+                toast.success(`${username} joined the room.`);
+            }
+            setClients(clients);
+
+            socket.emit(ACTIONS.SYNC_CODE, {
+                code: codeRef.current,
+                socketId
+            })
+        })
+
+        socket.on(ACTIONS.CODE_CHANGE, ({ code }) => {
+            if (code !== null) {
+                setCode(code);
+                codeRef.current = code;
+            }
+        })
+
+        socket.on(ACTIONS.DISCONNECTED, ({ socketId, username }) => {
+            toast.success(`${username} left the room`);
+            setClients((currentClients) => {
+                const updatedClients = currentClients.filter((client) => client.socketId !== socketId);
+                return updatedClients;
+            })
+        })
+
         return () => {
-            socketRef.current.off(ACTIONS.JOINED);
-            socketRef.current.off(ACTIONS.DISCONNECTED);
-            socketRef.current.disconnect();
+            socket?.off(ACTIONS.JOINED);
+            socket?.off(ACTIONS.CODE_CHANGE);
+            socket?.off(ACTIONS.DISCONNECTED);
+            socket?.disconnect();
         }
     }, [])
-
-    useEffect(() => {
-        if (socketRef.current) {
-            socketRef.current.on(ACTIONS.CODE_CHANGE, ({ code }) => {
-                if (code !== null) {
-                    setCode(code);
-                    codeRef.current = code;
-                }
-            })
-        }
-
-        return () => {
-            if (socketRef.current) {
-                socketRef.current.off(ACTIONS.CODE_CHANGE);
-            }
-        }
-    }, [socketRef.current])
 
     const onCodeChange = (code) => {
         setCode(code);
         codeRef.current = code;
-        socketRef.current.emit(ACTIONS.CODE_CHANGE, {
+        socket.emit(ACTIONS.CODE_CHANGE, {
             roomId,
             code,
         });
@@ -137,8 +128,6 @@ const Editor = () => {
             </div>
             <div className='editorWrap'>
                 <CodeEditor
-                    socketRef={socketRef}
-                    roomId={roomId}
                     code={code}
                     onCodeChange={onCodeChange}
                 />
